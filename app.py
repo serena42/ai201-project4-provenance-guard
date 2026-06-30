@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 
 from audit_log import append_entry, get_entries
+from confidence import compute_confidence
+from signals.cognitive_signal import get_cognitive_signal
 from signals.llm_signal import get_llm_signal
 
 load_dotenv()
@@ -31,10 +33,11 @@ def submit():
 
     content_id = str(uuid.uuid4())
     signal1 = get_llm_signal(text)
+    signal2 = get_cognitive_signal(text)
 
-    # Confidence is just signal 1's score for now — combining with signal 2
-    # into a real weighted confidence score comes in Milestone 4.
-    confidence = signal1["llm_human_score"]
+    confidence = compute_confidence(
+        signal1["llm_human_score"], signal2["cognitive_pattern_score"], signal1["doc_type"]
+    )
     attribution = classify_attribution(confidence)
     status = "classified"
 
@@ -46,6 +49,7 @@ def submit():
             "attribution": attribution,
             "confidence": confidence,
             "llm_human_score": signal1["llm_human_score"],
+            "cognitive_pattern_score": signal2["cognitive_pattern_score"],
             "doc_type": signal1["doc_type"],
             "status": status,
         }
@@ -60,6 +64,7 @@ def submit():
             "label": f"[placeholder label] attribution={attribution}",
             "signals": {
                 "llm_human_score": signal1["llm_human_score"],
+                "cognitive_pattern_score": signal2["cognitive_pattern_score"],
                 "doc_type": signal1["doc_type"],
             },
             "status": status,

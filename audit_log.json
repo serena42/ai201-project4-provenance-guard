@@ -31,5 +31,53 @@
     "llm_human_score": 0.4,
     "doc_type": "academic_abstract",
     "status": "classified"
+  },
+  {
+    "timestamp": "2026-06-30T19:34:47.318279+00:00",
+    "event_type": "classification_created",
+    "content_id": "ea6c9d3c-2ec6-498e-b1c8-03247e337fed",
+    "creator_id": "m4-clear-ai",
+    "attribution": "likely_ai",
+    "confidence": 0.194,
+    "llm_human_score": 0.2,
+    "cognitive_pattern_score": 0.0,
+    "doc_type": "academic_abstract",
+    "status": "classified"
+  },
+  {
+    "timestamp": "2026-06-30T19:35:25.863010+00:00",
+    "event_type": "classification_created",
+    "content_id": "fd9419e9-6555-4d4f-8e44-56f5d395bdb8",
+    "creator_id": "m4-clear-human",
+    "attribution": "likely_human",
+    "confidence": 0.8434772727272728,
+    "llm_human_score": 0.9,
+    "cognitive_pattern_score": 0.9090909090909092,
+    "doc_type": "blog_post",
+    "status": "classified"
+  },
+  {
+    "timestamp": "2026-06-30T19:35:36.853322+00:00",
+    "event_type": "classification_created",
+    "content_id": "dadd89f6-6b76-4b78-9ca0-55254c4af57c",
+    "creator_id": "m4-borderline-formal-human",
+    "attribution": "uncertain",
+    "confidence": 0.49149999999999994,
+    "llm_human_score": 0.7,
+    "cognitive_pattern_score": 0.0,
+    "doc_type": "academic_abstract",
+    "status": "classified"
+  },
+  {
+    "timestamp": "2026-06-30T19:35:45.552615+00:00",
+    "event_type": "classification_created",
+    "content_id": "ae7cbb1a-8d2e-4eec-a16b-3b37c4cc82ee",
+    "creator_id": "m4-borderline-edited-ai",
+    "attribution": "uncertain",
+    "confidence": 0.44900000000000007,
+    "llm_human_score": 0.8,
+    "cognitive_pattern_score": 0.0,
+    "doc_type": "blog_post",
+    "status": "classified"
   }
 ]
