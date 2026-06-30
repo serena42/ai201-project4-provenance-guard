@@ -1,0 +1,35 @@
+[
+  {
+    "timestamp": "2026-06-30T19:23:44.390082+00:00",
+    "event_type": "classification_created",
+    "content_id": "7aaa09ae-57fd-403f-8db8-024f25c9abee",
+    "creator_id": "test-user-1",
+    "attribution": "likely_human",
+    "confidence": 0.9,
+    "llm_human_score": 0.9,
+    "doc_type": "blog_post",
+    "status": "classified"
+  },
+  {
+    "timestamp": "2026-06-30T19:26:53.060881+00:00",
+    "event_type": "classification_created",
+    "content_id": "a7a9dd2d-b68a-4702-a076-4ded8386b72f",
+    "creator_id": "test-user-2",
+    "attribution": "likely_ai",
+    "confidence": 0.2,
+    "llm_human_score": 0.2,
+    "doc_type": "academic_abstract",
+    "status": "classified"
+  },
+  {
+    "timestamp": "2026-06-30T19:26:53.833532+00:00",
+    "event_type": "classification_created",
+    "content_id": "cfaca863-f426-4356-85f9-b01f2a2dbf71",
+    "creator_id": "test-user-3",
+    "attribution": "uncertain",
+    "confidence": 0.4,
+    "llm_human_score": 0.4,
+    "doc_type": "academic_abstract",
+    "status": "classified"
+  }
+]
