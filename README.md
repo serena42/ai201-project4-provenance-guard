@@ -1,8 +1,4 @@
-# NAME_OF_PROJECT Exemplar Project
-One line high-level description of project
+# Provenance Guard
+Provenance Guard is a backend system that any creative sharing platform could plug into to classify submitted content, score confidence in that classification, surface a transparency label to users, and handle appeals from creators who believe they've been misclassified.
 
 Additional detailed project overview
-
-Find the core instructions for this lab on the [CodePath course portal](https://courses.codepath.org/courses/summer_internship_for_tech_excellence/unit/2#!lab)
-
-Optional: Checkout our deployed page at []() using GitHub Pages
