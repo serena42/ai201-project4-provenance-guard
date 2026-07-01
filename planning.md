@@ -286,6 +286,17 @@ Appeal Flow
 - [ ] Phase 5: Lock AI tool prompts/verification plan
 - [ ] Phase 6: Reconcile this plan with README evidence checklist
 
+## Stretch Feature: Ensemble Detection (planned before implementation)
+
+- Third signal: Stylometric heuristics (`signals/stylometric_signal.py`), pure Python, no external libraries. Averages three sub-metrics into `stylometric_score` (0.0-1.0, human-likelihood):
+  - Sentence-length variance: coefficient of variation of word-count-per-sentence, scaled against a typical-human CV of ~0.6. AI text tends toward more uniform sentence lengths; human text is more variable.
+  - Type-token ratio (vocabulary diversity): unique words / total words, scored highest inside a "typical human" band of 0.4-0.7 and penalized outside it in either direction (extreme repetition or extreme lexical uniqueness are both atypical of casual human writing).
+  - Punctuation variety: how many distinct punctuation styles (`!`, `?`, `...`, em dash, `;`, `:`, quotes) appear at all, as a rough proxy for expressive/informal variation.
+  - Blind spots: all three sub-metrics are length-sensitive and can be noisy on very short submissions (few sentences), and formal human prose (which is itself low-variance and low-punctuation-variety) can score AI-like on this signal alone — the same failure mode as Signal 2, for a related reason.
+- Combination update: `compute_confidence()` now takes all three scores (`llm_human_score`, `cognitive_pattern_score`, `stylometric_score`) plus `doc_type`. Baseline weights become `llm=0.45, cognitive=0.30, stylometric=0.25`; for `doc_type in {legal_brief, academic_abstract, grant_proposal}` (where the cognitive signal is least reliable), weights shift to `llm=0.55, cognitive=0.15, stylometric=0.30`.
+- Conflict resolution (voting): each signal "votes" human (score >= 0.5) or AI (score < 0.5). A unanimous 3-0 vote uses the weights as-is. A 2-1 split halves the lone dissenting signal's weight and renormalizes the remaining weights to sum to 1.0 before computing the weighted average — so no single signal can override two that agree, but a genuine minority signal still contributes at reduced influence rather than being discarded outright. The same center-compression step (`confidence = 0.5 + 0.85 * (raw - 0.5)`) is applied afterward.
+- Verification plan: re-run the four Milestone 4 test samples through the three-signal pipeline and confirm each still lands in its expected band; additionally construct one deliberate 2-1 split case (one signal disagreeing with the other two) and confirm the outlier's weight is visibly reduced in the resulting confidence value versus a plain unweighted average.
+
 ## Notes and Open Questions
 
 - Open questions to resolve before coding:

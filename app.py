@@ -12,6 +12,7 @@ from confidence import compute_confidence
 from labels import get_label
 from signals.cognitive_signal import get_cognitive_signal
 from signals.llm_signal import get_llm_signal
+from signals.stylometric_signal import get_stylometric_signal
 
 load_dotenv()
 
@@ -46,9 +47,13 @@ def submit():
     content_id = str(uuid.uuid4())
     signal1 = get_llm_signal(text)
     signal2 = get_cognitive_signal(text)
+    signal3 = get_stylometric_signal(text)
 
     confidence = compute_confidence(
-        signal1["llm_human_score"], signal2["cognitive_pattern_score"], signal1["doc_type"]
+        signal1["llm_human_score"],
+        signal2["cognitive_pattern_score"],
+        signal3["stylometric_score"],
+        signal1["doc_type"],
     )
     attribution = classify_attribution(confidence)
     status = "classified"
@@ -63,6 +68,7 @@ def submit():
             "confidence": confidence,
             "llm_human_score": signal1["llm_human_score"],
             "cognitive_pattern_score": signal2["cognitive_pattern_score"],
+            "stylometric_score": signal3["stylometric_score"],
             "doc_type": signal1["doc_type"],
             "status": status,
         }
@@ -78,6 +84,7 @@ def submit():
             "signals": {
                 "llm_human_score": signal1["llm_human_score"],
                 "cognitive_pattern_score": signal2["cognitive_pattern_score"],
+                "stylometric_score": signal3["stylometric_score"],
                 "doc_type": signal1["doc_type"],
             },
             "status": status,
@@ -111,6 +118,7 @@ def appeal():
             "confidence": prior.get("confidence"),
             "llm_human_score": prior.get("llm_human_score"),
             "cognitive_pattern_score": prior.get("cognitive_pattern_score"),
+            "stylometric_score": prior.get("stylometric_score"),
             "doc_type": prior.get("doc_type"),
             "status": status_after,
             "status_before": status_before,
