@@ -1,12 +1,21 @@
 # Provenance Guard
 Provenance Guard is a backend system that any creative sharing platform could plug into to classify submitted content, score confidence in that classification, surface a transparency label to users, and handle appeals from creators who believe they've been misclassified.
 
-##Architecture overview: 
-the path a submission takes from input to transparency label
-Detection signals: what each signal measures, why you chose it, and what it misses
+## Architecture overview
 
-##Confidence scoring: 
-how you combined signals into a score, how you validated it's meaningful, and two example submissions with noticeably different confidence scores (one high-confidence, one lower-confidence) showing the actual scores
+A creator submits text and a `creator_id` to `POST /submit`. The app generates a `content_id`, runs the text through two independent detection signals (an LLM-based judge and a set of cognitive-pattern heuristics), combines their outputs into a single confidence score via doc-type-weighted averaging, maps that score to an attribution label (`likely_ai` / `uncertain` / `likely_human`) and a plain-language transparency label, and writes a structured entry to the audit log before returning the result. If a creator disagrees, `POST /appeal` records their reasoning, flips the content's status to `under_review`, and logs the appeal alongside the original decision so a moderator can review both together via `GET /log`.
+
+**Detection signals:**
+- **Signal 1 — Groq-based LLM classifier:** measures holistic semantic/stylistic coherence and returns a 0.0–1.0 human-likelihood score plus a `doc_type` classification. Chosen because it captures broad, high-level stylistic uniformity that's hard to express as hand-written heuristics. Misses: can mistake highly polished human writing for AI-like uniformity, and is not perfectly deterministic even at `temperature=0`.
+- **Signal 2 — cognitive-pattern heuristics:** measures self-reference density, constraint-awareness hedging ("I think," "honestly"), and implicit-context-assumption phrases ("as usual") as a pure-Python 0.0–1.0 score. Chosen because it's a cheap, deterministic, independent check that doesn't rely on the LLM's own judgment. Misses: formal/edited registers (academic, legal, grant writing) suppress these cues even when the author is human — see Known Limitations.
+
+## Confidence scoring
+
+`compute_confidence()` combines `llm_human_score` (s1) and `cognitive_pattern_score` (s2) via a doc-type-selected weighted average (`w1=0.55/w2=0.45` normally, `w1=0.70/w2=0.30` for formal doc types), then applies center compression (`confidence = 0.5 + 0.85 * (raw - 0.5)`) so the system doesn't overstate certainty. Validated by running the four curated samples from `planning.md` (clear AI, clear human, two borderline cases) through the signals independently and then end-to-end through `/submit` — see the Milestone 3/4 tables below — and by checking that the two signals disagree on at least one sample (the lightly-edited-AI case) to confirm they're contributing independent information rather than duplicating each other.
+
+Two example submissions with different confidence, both captured from a live `/submit` call:
+- High confidence: casual first-person restaurant review → `confidence = 0.87825`, `attribution = "likely_human"`.
+- Low confidence: formal AI-generated paragraph on AI ethics → `confidence = 0.194`, `attribution = "likely_ai"`.
 
 ### Signal 1 (Groq) test results — Milestone 3
 
@@ -47,16 +56,91 @@ Three of four samples landed in the expected band. The lightly-edited-AI sample 
 
 All four samples now land in their expected bands. Notably, the lightly-edited-AI sample — which signal 1 alone misclassified as high-confidence human (0.8) in Milestone 3 — is corrected by the combination: signal 2's low cognitive-pattern score pulls the combined confidence down into the `uncertain` band (0.45–0.53), which is the intended behavior for ambiguous content. This is the clearest evidence that the two signals are doing genuinely independent work rather than duplicating each other.
 
-##Transparency label: 
-typed description of all three variants (high-confidence AI, human, uncertain) showing the exact text each one displays; screenshot or mockup optional
+## Transparency label
 
-##Rate limiting: the limits you chose and your reasoning for those specific values
+`labels.py` maps the `attribution` value returned by `classify_attribution()` to one of three exact strings, all in plain language (no "classifier output," "logit," or score jargon):
 
-##Known limitations: 
-at least one specific type of content your system would likely misclassify and why
+| Attribution | Trigger | Exact label text |
+|---|---|---|
+| `likely_ai` | confidence < 0.35 | "This content appears likely AI-generated. Confidence in this assessment is high. If you created this yourself, you can submit an appeal for human review." |
+| `uncertain` | 0.35 ≤ confidence ≤ 0.70 | "We could not determine authorship with high confidence. This content may include human writing, AI assistance, or both." |
+| `likely_human` | confidence > 0.70 | "This content appears likely human-written. Confidence in this assessment is high, but automated attribution is not perfect." |
 
-##Spec reflection: 
-one way the spec helped you, one way implementation diverged from it and why
+Live evidence from `POST /submit` — the label text visibly differs between the high- and low-confidence cases below, not just the number:
 
-##AI usage section: 
-at least 2 specific instances describing what you directed the AI to do and what you revised or overrode
+- Human sample (confidence 0.878): `"attribution": "likely_human"`, label = *"This content appears likely human-written. Confidence in this assessment is high, but automated attribution is not perfect."*
+- AI sample (confidence 0.194): `"attribution": "likely_ai"`, label = *"This content appears likely AI-generated. Confidence in this assessment is high. If you created this yourself, you can submit an appeal for human review."*
+
+## Appeals workflow
+
+`POST /appeal` takes `content_id` and `creator_reasoning`, looks up the most recent audit entry for that `content_id`, flips `status` from `classified` to `under_review`, and appends a new `appeal_submitted` event that preserves the original attribution/confidence/signal scores alongside the appeal text.
+
+Demo — appealing the human-sample submission above:
+
+Request:
+```json
+POST /appeal
+{"content_id": "fccdb33b-3a78-4a0c-b938-5f13c74ae542", "creator_reasoning": "I wrote this myself from personal experience, it was not AI generated."}
+```
+
+Response:
+```json
+{
+  "content_id": "fccdb33b-3a78-4a0c-b938-5f13c74ae542",
+  "status": "under_review",
+  "message": "Appeal received and queued for review.",
+  "appeal_logged_at": "2026-07-01T00:03:26.850334+00:00"
+}
+```
+
+The resulting audit log (`GET /log`) shows both the original classification and the appeal for the same `content_id`, with `status_before`/`status_after` and the creator's reasoning preserved:
+
+```json
+{
+  "event_type": "appeal_submitted",
+  "content_id": "fccdb33b-3a78-4a0c-b938-5f13c74ae542",
+  "creator_id": "test-user-1",
+  "attribution": "likely_human",
+  "confidence": 0.87825,
+  "status": "under_review",
+  "status_before": "classified",
+  "status_after": "under_review",
+  "appeal_reasoning": "I wrote this myself from personal experience, it was not AI generated.",
+  "timestamp": "2026-07-01T00:03:26.850377+00:00"
+}
+```
+
+## Rate limiting
+
+`POST /submit` is limited to **5 requests per minute and 50 per day, per client IP** (Flask-Limiter, in-memory storage). `POST /appeal` and `GET /log` are left unthrottled so creators can always contest a decision and reviewers can always inspect the log.
+
+Reasoning: a real creator submitting drafts for review is unlikely to fire more than a handful of requests in a given minute — 5/minute leaves comfortable headroom for normal iterative use (submit, revise, resubmit) while blocking scripted flooding. The 50/day ceiling caps sustained abuse across a session without affecting a legitimate writer who submits a few pieces a day, and it also protects the project's Groq API quota from being exhausted by a single client during grading/demo traffic.
+
+Demo — 7 rapid `POST /submit` calls from the same client, with 2 prior submissions already counted against the same window:
+
+```
+request 1 -> 200
+request 2 -> 200
+request 3 -> 200
+request 4 -> 429
+request 5 -> 429
+request 6 -> 429
+request 7 -> 429
+```
+
+The first 3 succeed (bringing the window total to 5, since 2 requests had already been made earlier in the same minute), and every request past the limit returns `429 Too Many Requests`.
+
+## Known limitations
+
+Formal, heavily-edited human writing (academic abstracts, legal briefs, grant proposals) is the content type most likely to be misclassified. Signal 2 (cognitive-pattern heuristics) looks for first-person self-reference and casual hedging phrases ("I think," "honestly," "as usual") — cues that formal registers deliberately avoid — so a genuinely human-written abstract can score `cognitive_pattern_score = 0.0`, the same as AI-generated text. `compute_confidence()` partially compensates by lowering Signal 2's weight for `doc_type in {academic_abstract, legal_brief, grant_proposal}` (0.30 instead of 0.45), but this only dampens the effect; it doesn't eliminate it, since Signal 1 (the LLM judge) was also observed to be non-deterministic on formal borderline text (see the "Borderline (formal human)" row in Milestone 4 above, where `llm_human_score` swung from 0.4 to 0.8 across runs at `temperature=0`). A formal human writer is therefore at real risk of landing in the `uncertain` band even when the LLM signal alone would have scored them as human.
+
+## Spec reflection
+
+The spec helped most by forcing exact label text and exact threshold ranges to be written down in `planning.md` *before* any code existed — this made `classify_attribution()` and `labels.py` nearly copy-paste from the plan, and it caught the inconsistency between the two files early rather than at grading time.
+
+Where implementation diverged: the plan's appeal schema (`## Appeals Workflow` in `planning.md`) describes a no-op path for re-appealing already-`under_review` content ("appends the new reasoning as an additional appeal note"). The actual implementation doesn't special-case this — `POST /appeal` always looks up the latest entry, always sets `status_after = "under_review"`, and always appends a new `appeal_submitted` event. In practice this produces the same observable behavior (another appeal event is logged, status stays `under_review`) without needing a separate branch, so the simpler unconditional path was kept and the plan's distinction was dropped as unnecessary complexity rather than implemented literally.
+
+## AI usage
+
+1. **Milestone 4 (second signal + confidence scoring):** I gave the AI tool the Architecture, Detection Signals, and Uncertainty Representation sections of `planning.md` and asked it to generate `get_cognitive_signal()` plus `compute_confidence()`. The generated `compute_confidence()` initially used a flat 0.5/0.5 weighting regardless of `doc_type`; I overrode this to add the doc-type-conditional weighting (0.55/0.45 baseline vs. 0.70/0.30 for `academic_abstract`/`legal_brief`/`grant_proposal`) specified in the plan, since the flat version would have let Signal 2 drag down clearly-human formal writing.
+2. **Milestone 5 (labels + appeals + rate limiting):** I gave the AI tool the Transparency Label Design, Appeals Workflow, Audit Log Design, and Rate Limiting Plan sections and asked it to generate `labels.py`, the `POST /appeal` route, and the Flask-Limiter setup. The first draft of `POST /appeal` searched the audit log for an entry by `content_id` without restricting to the *latest* one, so if content had already been appealed once, a second appeal could read stale prior-decision fields. I revised `audit_log.py` to add `get_latest_entry_by_content_id()` (using the last match instead of the first) and updated the route to use it, so repeated appeals always reflect the most recent status.

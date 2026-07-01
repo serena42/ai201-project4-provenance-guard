@@ -24,3 +24,8 @@ def append_entry(entry):
 def get_entries(limit=50):
     entries = _read_all()
     return list(reversed(entries))[:limit]
+
+
+def get_latest_entry_by_content_id(content_id):
+    matches = [e for e in _read_all() if e.get("content_id") == content_id]
+    return matches[-1] if matches else None
