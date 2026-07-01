@@ -297,6 +297,15 @@ Appeal Flow
 - Conflict resolution (voting): each signal "votes" human (score >= 0.5) or AI (score < 0.5). A unanimous 3-0 vote uses the weights as-is. A 2-1 split halves the lone dissenting signal's weight and renormalizes the remaining weights to sum to 1.0 before computing the weighted average — so no single signal can override two that agree, but a genuine minority signal still contributes at reduced influence rather than being discarded outright. The same center-compression step (`confidence = 0.5 + 0.85 * (raw - 0.5)`) is applied afterward.
 - Verification plan: re-run the four Milestone 4 test samples through the three-signal pipeline and confirm each still lands in its expected band; additionally construct one deliberate 2-1 split case (one signal disagreeing with the other two) and confirm the outlier's weight is visibly reduced in the resulting confidence value versus a plain unweighted average.
 
+## Stretch Feature: Analytics Dashboard (planned before implementation)
+
+- Endpoint: `GET /analytics` (`analytics.py`), following the same no-auth/JSON-for-grading-visibility pattern as `GET /log`.
+- Metric 1 - detection pattern: count and percentage of `classification_created` entries in each of `likely_ai` / `uncertain` / `likely_human`.
+- Metric 2 - appeal rate: distinct appealed `content_id`s divided by total classifications, so a content item appealed more than once is only counted once.
+- Metric 3 (chosen) - signal disagreement rate: the fraction of classifications where the three per-signal votes (score >= 0.5 = human) were not unanimous. This reuses the same vote definition as `compute_confidence()`'s conflict-resolution logic (see Ensemble Detection above), so it directly measures how often the 2-1 outlier-dampening path is actually exercised in practice, rather than being an arbitrary extra metric.
+- Data source: `audit_log.get_all_entries()` (unfiltered, unlimited) rather than the paginated `get_entries()` used by `GET /log`, so analytics reflect the full history, not just the most recent 50 entries.
+- Verification plan: submit a mix of clear-AI, clear-human, and one deliberately 2-1-split sample, appeal one of them, and confirm `/analytics` reports the correct counts/percentages for all three metrics against that known input set.
+
 ## Notes and Open Questions
 
 - Open questions to resolve before coding:

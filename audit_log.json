@@ -1,8 +1,8 @@
 [
   {
-    "timestamp": "2026-07-01T00:51:14.368626+00:00",
+    "timestamp": "2026-07-01T00:58:03.515396+00:00",
     "event_type": "classification_created",
-    "content_id": "2b06ffd2-0815-4f4e-ad0d-f96cb78320e5",
+    "content_id": "b9ebe04f-c4fa-4512-81d7-33dd947f149c",
     "creator_id": "test-user-1",
     "attribution": "likely_human",
     "confidence": 0.7830297619047619,
@@ -13,22 +13,48 @@
     "status": "classified"
   },
   {
-    "timestamp": "2026-07-01T00:51:14.774728+00:00",
+    "timestamp": "2026-07-01T00:58:03.771504+00:00",
     "event_type": "classification_created",
-    "content_id": "c7b95daf-c1f0-4452-93df-be1c856cbb15",
+    "content_id": "4af13b1a-d35a-4feb-8d7c-1c9df136d7d3",
     "creator_id": "test-user-2",
     "attribution": "likely_ai",
-    "confidence": 0.2672547934190793,
+    "confidence": 0.2790467621677374,
     "llm_human_score": 0.2,
     "cognitive_pattern_score": 0.0,
-    "stylometric_score": 0.3872736996826638,
+    "stylometric_score": 0.43351671438328365,
     "doc_type": "academic_abstract",
     "status": "classified"
   },
   {
-    "timestamp": "2026-07-01T00:51:32.039380+00:00",
+    "timestamp": "2026-07-01T00:58:04.170965+00:00",
+    "event_type": "classification_created",
+    "content_id": "39beac69-6d73-44b2-8a1c-356f7d259335",
+    "creator_id": "test-user-3",
+    "attribution": "likely_ai",
+    "confidence": 0.32180600335661724,
+    "llm_human_score": 0.4,
+    "cognitive_pattern_score": 0.0,
+    "stylometric_score": 0.23453334649653804,
+    "doc_type": "academic_abstract",
+    "status": "classified"
+  },
+  {
+    "timestamp": "2026-07-01T00:58:04.443530+00:00",
+    "event_type": "classification_created",
+    "content_id": "de20486c-1820-490c-9816-9793e7dc2fd8",
+    "creator_id": "test-user-4",
+    "attribution": "uncertain",
+    "confidence": 0.4801989668037847,
+    "llm_human_score": 0.8,
+    "cognitive_pattern_score": 0.28735632183908044,
+    "stylometric_score": 0.4129568809598476,
+    "doc_type": "blog_post",
+    "status": "classified"
+  },
+  {
+    "timestamp": "2026-07-01T00:58:14.886472+00:00",
     "event_type": "appeal_submitted",
-    "content_id": "2b06ffd2-0815-4f4e-ad0d-f96cb78320e5",
+    "content_id": "b9ebe04f-c4fa-4512-81d7-33dd947f149c",
     "creator_id": "test-user-1",
     "attribution": "likely_human",
     "confidence": 0.7830297619047619,
@@ -39,6 +65,6 @@
     "status": "under_review",
     "status_before": "classified",
     "status_after": "under_review",
-    "appeal_reasoning": "This was written by me based on a real experience; I only used AI to fix a couple of typos."
+    "appeal_reasoning": "I wrote this myself from personal experience, it was not AI generated."
   }
 ]

@@ -7,7 +7,8 @@ from flask import Flask, jsonify, request
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-from audit_log import append_entry, get_entries, get_latest_entry_by_content_id
+from analytics import compute_analytics
+from audit_log import append_entry, get_all_entries, get_entries, get_latest_entry_by_content_id
 from confidence import compute_confidence
 from labels import get_label
 from signals.cognitive_signal import get_cognitive_signal
@@ -140,6 +141,11 @@ def appeal():
 @app.route("/log", methods=["GET"])
 def log():
     return jsonify({"entries": get_entries()})
+
+
+@app.route("/analytics", methods=["GET"])
+def analytics():
+    return jsonify(compute_analytics(get_all_entries()))
 
 
 if __name__ == "__main__":

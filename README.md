@@ -75,21 +75,21 @@ Live evidence from `POST /submit` — the label text visibly differs between the
 
 `POST /appeal` takes `content_id` and `creator_reasoning`, looks up the most recent audit entry for that `content_id`, flips `status` from `classified` to `under_review`, and appends a new `appeal_submitted` event that preserves the original attribution/confidence/signal scores alongside the appeal text.
 
-Demo — appealing the human-sample submission above:
+Demo — appealing the human-sample submission above (matches the committed `audit_log.json`):
 
 Request:
 ```json
 POST /appeal
-{"content_id": "fccdb33b-3a78-4a0c-b938-5f13c74ae542", "creator_reasoning": "I wrote this myself from personal experience, it was not AI generated."}
+{"content_id": "b9ebe04f-c4fa-4512-81d7-33dd947f149c", "creator_reasoning": "I wrote this myself from personal experience, it was not AI generated."}
 ```
 
 Response:
 ```json
 {
-  "content_id": "fccdb33b-3a78-4a0c-b938-5f13c74ae542",
+  "content_id": "b9ebe04f-c4fa-4512-81d7-33dd947f149c",
   "status": "under_review",
   "message": "Appeal received and queued for review.",
-  "appeal_logged_at": "2026-07-01T00:03:26.850334+00:00"
+  "appeal_logged_at": "2026-07-01T00:58:14.886439+00:00"
 }
 ```
 
@@ -98,15 +98,15 @@ The resulting audit log (`GET /log`) shows both the original classification and 
 ```json
 {
   "event_type": "appeal_submitted",
-  "content_id": "fccdb33b-3a78-4a0c-b938-5f13c74ae542",
+  "content_id": "b9ebe04f-c4fa-4512-81d7-33dd947f149c",
   "creator_id": "test-user-1",
   "attribution": "likely_human",
-  "confidence": 0.87825,
+  "confidence": 0.7830297619047619,
   "status": "under_review",
   "status_before": "classified",
   "status_after": "under_review",
   "appeal_reasoning": "I wrote this myself from personal experience, it was not AI generated.",
-  "timestamp": "2026-07-01T00:03:26.850377+00:00"
+  "timestamp": "2026-07-01T00:58:14.886472+00:00"
 }
 ```
 
@@ -156,6 +156,31 @@ Live demo showing all three individual signal scores alongside the combined resu
 - Formal AI-generated paragraph → `llm_human_score=0.2`, `cognitive_pattern_score=0.0`, `stylometric_score=0.387` → combined `confidence=0.267`, `attribution=likely_ai`.
 
 Conflict-resolution check (constructed 2-1 split, not from live traffic): `compute_confidence(llm=0.9, cognitive=0.2, stylometric=0.3, doc_type="blog_post")` → the LLM signal votes human while the other two vote AI, so the LLM's weight is halved and renormalized before averaging, producing `confidence=0.445` (`uncertain`) — noticeably pulled toward the two-signal majority rather than sitting at the unweighted average of all three raw scores.
+
+## Stretch feature: Analytics dashboard
+
+`GET /analytics` (`analytics.py`) computes 3 metrics over the full audit log (not just the most recent page):
+
+1. **Detection pattern** — count and percentage of classifications in each of `likely_ai` / `uncertain` / `likely_human`.
+2. **Appeal rate** — distinct appealed `content_id`s divided by total classifications (a content item appealed more than once only counts once).
+3. **Signal disagreement rate (chosen 3rd metric)** — the fraction of classifications where the three per-signal votes (score ≥ 0.5 = human) were *not* unanimous. This reuses the exact vote definition from `compute_confidence()`'s conflict-resolution logic, so it directly measures how often the ensemble's 2-1 outlier-dampening path actually gets exercised in practice.
+
+Live demo after 4 submissions (clear-human, clear-AI, formal-borderline, lightly-edited-AI-borderline) and 1 appeal — matches the committed `audit_log.json`:
+
+```json
+{
+  "total_submissions": 4,
+  "detection_pattern": {
+    "likely_ai": {"count": 2, "pct": 0.5},
+    "uncertain": {"count": 1, "pct": 0.25},
+    "likely_human": {"count": 1, "pct": 0.25}
+  },
+  "appeal_rate": {"appealed_count": 1, "total_classifications": 4, "rate": 0.25},
+  "signal_disagreement_rate": {"disagreement_count": 1, "eligible_count": 4, "rate": 0.25}
+}
+```
+
+The one flagged disagreement corresponds to the "lightly-edited AI" borderline sample, where `llm_human_score=0.8` (human vote) disagreed with `cognitive_pattern_score=0.29` and `stylometric_score=0.41` (both AI votes) — exactly the case the ensemble's conflict-resolution logic is designed to catch and dampen, and it landed in the `uncertain` band as a result.
 
 ## AI usage
 

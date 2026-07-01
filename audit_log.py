@@ -29,3 +29,7 @@ def get_entries(limit=50):
 def get_latest_entry_by_content_id(content_id):
     matches = [e for e in _read_all() if e.get("content_id") == content_id]
     return matches[-1] if matches else None
+
+
+def get_all_entries():
+    return _read_all()
