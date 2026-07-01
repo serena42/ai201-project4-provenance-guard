@@ -66,5 +66,44 @@
     "status_before": "classified",
     "status_after": "under_review",
     "appeal_reasoning": "I wrote this myself from personal experience, it was not AI generated."
+  },
+  {
+    "timestamp": "2026-07-01T01:01:51.201419+00:00",
+    "event_type": "verification_completed",
+    "creator_id": "verified-user",
+    "confidence": 0.8041650295242496,
+    "llm_human_score": 0.9,
+    "cognitive_pattern_score": 1.0,
+    "stylometric_score": 0.6113648448199981,
+    "doc_type": "blog_post",
+    "status": "verified"
+  },
+  {
+    "timestamp": "2026-07-01T01:01:59.752110+00:00",
+    "event_type": "classification_created",
+    "content_id": "04b19326-111b-439c-9e30-fa06221f6ef8",
+    "creator_id": "verified-user",
+    "attribution": "likely_human",
+    "confidence": 0.7856838337780498,
+    "llm_human_score": 0.9,
+    "cognitive_pattern_score": 1.0,
+    "stylometric_score": 0.2126903958192328,
+    "doc_type": "blog_post",
+    "status": "classified",
+    "creator_verified": true
+  },
+  {
+    "timestamp": "2026-07-01T01:02:00.196651+00:00",
+    "event_type": "classification_created",
+    "content_id": "21b364d5-7ec6-4723-be33-87277c5eabe1",
+    "creator_id": "unverified-user",
+    "attribution": "likely_human",
+    "confidence": 0.7856838337780498,
+    "llm_human_score": 0.9,
+    "cognitive_pattern_score": 1.0,
+    "stylometric_score": 0.2126903958192328,
+    "doc_type": "blog_post",
+    "status": "classified",
+    "creator_verified": false
   }
 ]

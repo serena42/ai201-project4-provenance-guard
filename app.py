@@ -14,6 +14,14 @@ from labels import get_label
 from signals.cognitive_signal import get_cognitive_signal
 from signals.llm_signal import get_llm_signal
 from signals.stylometric_signal import get_stylometric_signal
+from verification import (
+    CERTIFICATE_LABEL,
+    VERIFICATION_CONFIDENCE_THRESHOLD,
+    VERIFICATION_MIN_WORD_COUNT,
+    get_verification,
+    is_verified,
+    mark_verified,
+)
 
 load_dotenv()
 
@@ -35,6 +43,27 @@ def classify_attribution(confidence):
     return "uncertain"
 
 
+def run_detection_pipeline(text):
+    signal1 = get_llm_signal(text)
+    signal2 = get_cognitive_signal(text)
+    signal3 = get_stylometric_signal(text)
+
+    confidence = compute_confidence(
+        signal1["llm_human_score"],
+        signal2["cognitive_pattern_score"],
+        signal3["stylometric_score"],
+        signal1["doc_type"],
+    )
+
+    return {
+        "llm_human_score": signal1["llm_human_score"],
+        "cognitive_pattern_score": signal2["cognitive_pattern_score"],
+        "stylometric_score": signal3["stylometric_score"],
+        "doc_type": signal1["doc_type"],
+        "confidence": confidence,
+    }
+
+
 @app.route("/submit", methods=["POST"])
 @limiter.limit("5 per minute;50 per day")
 def submit():
@@ -46,19 +75,12 @@ def submit():
         return jsonify({"error": "text and creator_id are required"}), 400
 
     content_id = str(uuid.uuid4())
-    signal1 = get_llm_signal(text)
-    signal2 = get_cognitive_signal(text)
-    signal3 = get_stylometric_signal(text)
-
-    confidence = compute_confidence(
-        signal1["llm_human_score"],
-        signal2["cognitive_pattern_score"],
-        signal3["stylometric_score"],
-        signal1["doc_type"],
-    )
+    result = run_detection_pipeline(text)
+    confidence = result["confidence"]
     attribution = classify_attribution(confidence)
     status = "classified"
     label = get_label(attribution)
+    verification = get_verification(creator_id)
 
     append_entry(
         {
@@ -67,28 +89,98 @@ def submit():
             "creator_id": creator_id,
             "attribution": attribution,
             "confidence": confidence,
-            "llm_human_score": signal1["llm_human_score"],
-            "cognitive_pattern_score": signal2["cognitive_pattern_score"],
-            "stylometric_score": signal3["stylometric_score"],
-            "doc_type": signal1["doc_type"],
+            "llm_human_score": result["llm_human_score"],
+            "cognitive_pattern_score": result["cognitive_pattern_score"],
+            "stylometric_score": result["stylometric_score"],
+            "doc_type": result["doc_type"],
             "status": status,
+            "creator_verified": verification is not None,
+        }
+    )
+
+    response = {
+        "content_id": content_id,
+        "creator_id": creator_id,
+        "attribution": attribution,
+        "confidence": confidence,
+        "label": label,
+        "signals": {
+            "llm_human_score": result["llm_human_score"],
+            "cognitive_pattern_score": result["cognitive_pattern_score"],
+            "stylometric_score": result["stylometric_score"],
+            "doc_type": result["doc_type"],
+        },
+        "status": status,
+    }
+
+    if verification is not None:
+        response["certificate"] = {
+            "type": "verified_human_creator",
+            "label": CERTIFICATE_LABEL,
+            "verified_at": verification["verified_at"],
+        }
+
+    return jsonify(response)
+
+
+@app.route("/verify", methods=["POST"])
+def verify():
+    data = request.get_json(silent=True) or {}
+    text = data.get("text")
+    creator_id = data.get("creator_id")
+
+    if not text or not creator_id:
+        return jsonify({"error": "text and creator_id are required"}), 400
+
+    word_count = len(text.split())
+    if word_count < VERIFICATION_MIN_WORD_COUNT:
+        return jsonify(
+            {
+                "creator_id": creator_id,
+                "verified": False,
+                "reason": f"Verification sample must be at least {VERIFICATION_MIN_WORD_COUNT} words "
+                f"(got {word_count}). Write a longer, spontaneous sample and try again.",
+            }
+        ), 400
+
+    result = run_detection_pipeline(text)
+    confidence = result["confidence"]
+    passed = confidence > VERIFICATION_CONFIDENCE_THRESHOLD
+
+    if not passed:
+        return jsonify(
+            {
+                "creator_id": creator_id,
+                "verified": False,
+                "confidence": confidence,
+                "reason": "Verification sample did not score as high-confidence human "
+                f"(needs confidence > {VERIFICATION_CONFIDENCE_THRESHOLD}, got {confidence}). "
+                "Try again with a longer, unedited, spontaneous sample.",
+            }
+        )
+
+    record = mark_verified(creator_id, confidence, word_count)
+
+    append_entry(
+        {
+            "event_type": "verification_completed",
+            "creator_id": creator_id,
+            "confidence": confidence,
+            "llm_human_score": result["llm_human_score"],
+            "cognitive_pattern_score": result["cognitive_pattern_score"],
+            "stylometric_score": result["stylometric_score"],
+            "doc_type": result["doc_type"],
+            "status": "verified",
         }
     )
 
     return jsonify(
         {
-            "content_id": content_id,
             "creator_id": creator_id,
-            "attribution": attribution,
+            "verified": True,
             "confidence": confidence,
-            "label": label,
-            "signals": {
-                "llm_human_score": signal1["llm_human_score"],
-                "cognitive_pattern_score": signal2["cognitive_pattern_score"],
-                "stylometric_score": signal3["stylometric_score"],
-                "doc_type": signal1["doc_type"],
-            },
-            "status": status,
+            "verified_at": record["verified_at"],
+            "certificate_label": CERTIFICATE_LABEL,
         }
     )
 

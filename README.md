@@ -182,8 +182,32 @@ Live demo after 4 submissions (clear-human, clear-AI, formal-borderline, lightly
 
 The one flagged disagreement corresponds to the "lightly-edited AI" borderline sample, where `llm_human_score=0.8` (human vote) disagreed with `cognitive_pattern_score=0.29` and `stylometric_score=0.41` (both AI votes) — exactly the case the ensemble's conflict-resolution logic is designed to catch and dampen, and it landed in the `uncertain` band as a result.
 
+## Stretch feature: Provenance certificate
+
+A creator can earn a **"Verified Human Creator"** certificate by submitting a spontaneous writing sample to `POST /verify`. The verification step deliberately reuses the existing 3-signal detection pipeline (`run_detection_pipeline()`, shared with `/submit`) rather than a separate mechanism, but requires a stricter bar than an ordinary `likely_human` result: at least 30 words, and combined confidence strictly greater than **0.80** (versus the normal 0.70 cutoff), since a certificate is a stronger, persistent claim than a single per-submission label.
+
+Verified creators are stored in `verified_creators.json` (`verification.py`) keyed by `creator_id`, and a `verification_completed` event is appended to the audit log. Once verified, every subsequent `POST /submit` response for that `creator_id` gets an extra `certificate` object — it does not replace or short-circuit the normal per-submission `attribution`/`confidence`/`label`, since the certificate vouches for the creator, not for any individual piece of content past or future.
+
+Certificate label text (visibly distinct from the three standard transparency label variants — different wording, a checkmark prefix, and delivered as a separate field rather than overwriting `label`):
+
+> "✓ Verified Human Creator: this creator completed a live-writing identity check and their account is marked as a verified human author. Individual submissions are still scored on their own merits above."
+
+Live demo — verifying `creator_id="verified-user"` with a casual, first-person sample (82 words, confidence 0.804):
+
+```json
+POST /verify -> {"creator_id": "verified-user", "verified": true, "confidence": 0.8041650295242496, "verified_at": "2026-07-01T01:01:51.199313+00:00", "certificate_label": "..."}
+```
+
+The same short garden-update text submitted by both creators — identical detection scores, but only the verified creator's response includes the `certificate` field:
+
+```json
+POST /submit {"creator_id": "verified-user", ...}    -> includes "certificate": {"type": "verified_human_creator", ...}
+POST /submit {"creator_id": "unverified-user", ...}  -> no "certificate" field, same attribution/confidence/label
+```
+
 ## AI usage
 
 1. **Milestone 4 (second signal + confidence scoring):** I gave the AI tool the Architecture, Detection Signals, and Uncertainty Representation sections of `planning.md` and asked it to generate `get_cognitive_signal()` plus `compute_confidence()`. The generated `compute_confidence()` initially used a flat 0.5/0.5 weighting regardless of `doc_type`; I overrode this to add the doc-type-conditional weighting (0.55/0.45 baseline vs. 0.70/0.30 for `academic_abstract`/`legal_brief`/`grant_proposal`) specified in the plan, since the flat version would have let Signal 2 drag down clearly-human formal writing.
 2. **Milestone 5 (labels + appeals + rate limiting):** I gave the AI tool the Transparency Label Design, Appeals Workflow, Audit Log Design, and Rate Limiting Plan sections and asked it to generate `labels.py`, the `POST /appeal` route, and the Flask-Limiter setup. The first draft of `POST /appeal` searched the audit log for an entry by `content_id` without restricting to the *latest* one, so if content had already been appealed once, a second appeal could read stale prior-decision fields. I revised `audit_log.py` to add `get_latest_entry_by_content_id()` (using the last match instead of the first) and updated the route to use it, so repeated appeals always reflect the most recent status.
 3. **Stretch (ensemble detection):** I asked the AI tool to extend `compute_confidence()` from a two-signal weighted average to three signals with a documented conflict-resolution rule, given the new Stretch Feature section of `planning.md`. Its first version detected a "2-1 split" but only ever dropped the outlier's weight to 0 instead of halving and renormalizing it, which meant a single dissenting signal was discarded entirely rather than contributing at reduced influence — a stronger override than the plan called for. I rewrote `_resolve_conflicts()` to halve the outlier's weight and renormalize the remaining weights to sum to 1.0, matching the "reduced influence, not discarded" behavior specified in planning.md.
+4. **Stretch (provenance certificate):** I asked the AI tool to implement `POST /verify` and the certificate storage, given the planning.md section describing the verification step and display rule. Its first draft of `/submit` replaced the standard `label` text with the certificate text for verified creators, which would have hidden the per-submission attribution result entirely. I overrode this to add the certificate as a separate `certificate` field alongside the unchanged `label`, so a verified creator's individual submissions are still independently scored and shown, matching the planning.md decision that the certificate augments rather than overrides per-submission detection.

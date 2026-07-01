@@ -306,6 +306,15 @@ Appeal Flow
 - Data source: `audit_log.get_all_entries()` (unfiltered, unlimited) rather than the paginated `get_entries()` used by `GET /log`, so analytics reflect the full history, not just the most recent 50 entries.
 - Verification plan: submit a mix of clear-AI, clear-human, and one deliberately 2-1-split sample, appeal one of them, and confirm `/analytics` reports the correct counts/percentages for all three metrics against that known input set.
 
+## Stretch Feature: Provenance Certificate (planned before implementation)
+
+- Verification step: `POST /verify` takes `creator_id` and a spontaneous writing sample (at least `VERIFICATION_MIN_WORD_COUNT=30` words) and runs it through the *existing* 3-signal detection pipeline (reused via a shared `run_detection_pipeline()` helper, not a separate mechanism). If the combined confidence exceeds `VERIFICATION_CONFIDENCE_THRESHOLD=0.80` (stricter than the normal `likely_human` cutoff of 0.70), the creator earns the certificate. This deliberately reuses detection infrastructure instead of inventing an unrelated identity-verification flow, and keeps the bar higher than ordinary submissions since a false certificate is a stronger claim than a per-submission label.
+- Storage: verified creators are stored in `verified_creators.json` (`verification.py`), keyed by `creator_id`, holding `verified_at`, `verification_confidence`, and `verification_word_count`. A `verification_completed` event is also appended to the audit log for traceability.
+- Display: once verified, every subsequent `POST /submit` response for that `creator_id` includes an additional `certificate` object (`type`, `label`, `verified_at`) alongside — not replacing — the normal `attribution`/`confidence`/`label` fields. The certificate is a creator-level trust signal; per-submission attribution and confidence are still computed and shown independently, so a verified creator's individual pieces are not exempted from scrutiny.
+- Certificate label text: "✓ Verified Human Creator: this creator completed a live-writing identity check and their account is marked as a verified human author. Individual submissions are still scored on their own merits above." — visually/textually distinct from the three standard transparency label variants (different wording, a checkmark prefix, and it appears as a separate field rather than replacing `label`).
+- Anticipated edge case: a creator could get lucky once and earn the certificate, then later submit AI-generated work. This is explicitly why the certificate augments rather than overrides per-submission detection — the certificate is a badge about a past verification event, not a blanket "never AI" guarantee.
+- Verification plan: verify one test creator with a genuinely human, casual writing sample (`confidence > 0.80`); confirm `/submit` responses for that `creator_id` include the `certificate` field while an unverified `creator_id` submitting the identical text does not.
+
 ## Notes and Open Questions
 
 - Open questions to resolve before coding:
